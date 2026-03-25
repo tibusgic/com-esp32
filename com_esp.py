@@ -38,7 +38,7 @@ def display_data(data):
 #  Main
 # ──────────────────────────────────────────────
 def main():
-    esp = espWalle("COM4", 115200)                      # Objet espWalle avec le port série et le baudrate de l'ESP32
+    esp = espWalle("COM5", 115200)                      # Objet espWalle avec le port série et le baudrate de l'ESP32
     esp.connect()                                       # Connexion série avec l'ESP32
 
     if esp.is_connected():

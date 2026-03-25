@@ -5,16 +5,16 @@ class dataWalle:
     Classe pour gérer les données reçues de l'ESP32.
 
     Attributs:
-        servo1 (float): Valeur du servo 1.
-        servo2 (float): Valeur du servo 2.
-        servo3 (float): Valeur du servo 3.
-        servo4 (float): Valeur du servo 4.
-        motor1 (float): Valeur du moteur 1.
-        motor2 (float): Valeur du moteur 2.
-        lidar (float): Valeur du lidar.
-        ultrasonic1 (float): Valeur de l'ultrason 1.
-        ultrasonic2 (float): Valeur de l'ultrason 2.
-        ultrasonic3 (float): Valeur de l'ultrason 3.
+        servo1 (int): Valeur du servo 1.
+        servo2 (int): Valeur du servo 2.
+        servo3 (int): Valeur du servo 3.
+        servo4 (int): Valeur du servo 4.
+        motor1 (int): Valeur du moteur 1.
+        motor2 (int): Valeur du moteur 2.
+        lidar (int): Valeur du lidar.
+        ultrasonic1 (int): Valeur de l'ultrason 1.
+        ultrasonic2 (int): Valeur de l'ultrason 2.
+        ultrasonic3 (int): Valeur de l'ultrason 3.
         bme280 (list): Liste contenant les valeurs [temperature, pression, humidité] (float) du capteur BME280.
         power (float): Valeur de la batterie.
 
@@ -39,14 +39,15 @@ class dataWalle:
         self.motor2 = 0           # Valeur du moteur 2
 
 
-        self.lidar = 0.0            # Valeur du lidar
-        self.ultrasonic1 = 0.0      # Valeur de l'ultrason 1
-        self.ultrasonic2 = 0.0      # Valeur de l'ultrason 2
-        self.ultrasonic3 = 0.0      # Valeur de l'ultrason 3
+        self.lidar = 0            # Valeur du lidar
+        self.ultrasonic1 = 0      # Valeur de l'ultrason 1
+        self.ultrasonic2 = 0      # Valeur de l'ultrason 2
+        self.ultrasonic3 = 0      # Valeur de l'ultrason 3
 
         self.bme280 = [0.0,0.0,0.0]       # [temperature, pression, humidité]
 
         self.power = 0            # Valeur de la batterie
+
 
 
 
@@ -63,9 +64,9 @@ class dataWalle:
             motor1 (int): Valeur du moteur 1.
             motor2 (int): Valeur du moteur 2.
             lidar (float): Valeur du lidar.
-            ultrasonic1 (float): Valeur de l'ultrason 1.
-            ultrasonic2 (float): Valeur de l'ultrason 2.
-            ultrasonic3 (float): Valeur de l'ultrason 3.
+            ultrasonic1 (int): Valeur de l'ultrason 1.
+            ultrasonic2 (int): Valeur de l'ultrason 2.
+            ultrasonic3 (int): Valeur de l'ultrason 3.
             bme280 (list): Liste contenant les valeurs [temperature, pression, humidité] (float) du capteur BME280.
             power (int): Valeur de la batterie.
 
