@@ -1,6 +1,7 @@
 #include <Arduino_JSON.h>
 #include <Wire.h>
 #include <Adafruit_BME280.h>
+#include <ESP32Servo.h>
 
 struct __attribute__((packed)) MyData {
   float bme280[3];
@@ -29,10 +30,20 @@ int send_data(MyData data);
 int getDistance();
 int getLidarDistance();
 int getBMEValues();
+int getServosAngles();
+int setServosAngles();
+void printServo();
 
 MyData data;
 
 Adafruit_BME280 bme;
+Servo servo1;
+Servo servo2;
+Servo servo3;
+
+int brocheServo1 = 4;
+int brocheServo2 = 5;
+int brocheServo3 = 18;
 
 hw_timer_t *Timer_send_data = NULL; // Timer 
 volatile bool flag_send_data = false; // Flag levé par l'ISR
@@ -57,6 +68,42 @@ void setup() {
     flag_send_data = true;                          // Lève le flag uniquement (ISR-safe)
   });
   timerAlarm(Timer_send_data, 400000, true, 0);   // 400ms
+
+
+ // Attachement du servo 1
+  if (servo1.attach(brocheServo1, 500, 2400) == -1) {
+    Serial.println("ERREUR : Impossible d'attacher le Servo 1 sur D4");
+  } else {
+    servo1.write(90);
+    Serial.println("Servo 1 attaché avec succès !");
+  }
+
+  // Attachement du servo 2
+  if (servo2.attach(brocheServo2, 500, 2400) == -1) {
+    Serial.println("ERREUR : Impossible d'attacher le Servo 2 sur D5 (Vérifie la version de ESP32Servo !)");
+  } else {
+    servo2.write(90);
+    Serial.println("Servo 2 attaché avec succès !");
+  }
+
+  // Attachement du servo 3
+  if (servo3.attach(brocheServo3, 500, 2400) == -1) {
+    Serial.println("ERREUR : Impossible d'attacher le Servo 3 sur D18");
+  } else {
+    servo3.write(90);
+    Serial.println("Servo 3 attaché avec succès !");
+  }
+
+  Serial.println("Lecture des servos");
+  data.servo1 = 90;
+  data.servo3 = 90;
+  data.servo1 = 90;
+
+  setServosAngles();
+  getServosAngles();
+
+  // envoie des donnée initiale
+  
 }
 
 void loop() {
@@ -65,6 +112,7 @@ void loop() {
   if (flag_send_data) {
     flag_send_data = false;
     send_data(data);
+    printServo();
   }
 
   // Lecture des commandes reçues depuis la Raspberry Pi
@@ -73,8 +121,26 @@ void loop() {
     if (messageRecu.startsWith("pi->")) {
       messageRecu = messageRecu.substring(4); // Enlève le préfixe "pi->"
       updateData(messageRecu);
+      setServosAngles();
     }
   }
+}
+
+void printServo(){
+Serial.printf("Servo1: %d, Servo2: %d, Servo3: %d\n", data.servo1, data.servo2, data.servo3);
+}
+
+int getServosAngles(){
+  data.servo1 = servo1.read();
+  data.servo2 = servo2.read();
+  data.servo3 = servo3.read();
+  return 0;
+}
+int setServosAngles(){
+  servo1.write(data.servo1);
+  servo2.write(data.servo2);
+  servo3.write(data.servo3);
+  return 0;
 }
 
 int getBMEValues() {
