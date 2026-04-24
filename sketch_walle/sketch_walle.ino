@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <ESP32Servo.h>
+#include <LiquidCrystal_I2C.h>
 
 struct __attribute__((packed)) MyData {
   float bme280[3];
@@ -24,6 +25,17 @@ struct __attribute__((packed)) MyData {
 const uint8_t TFLUNA_I2C_ADDR = 0x10;
 
 const int sensorD1Pin = 34;
+const int sensorD2Pin = 35;
+const int sensorD3Pin = 32;
+
+// MDD10A motor driver pins
+const int PWM1_PIN = 25;
+const int DIR1_PIN = 33;
+const int PWM2_PIN = 27;
+const int DIR2_PIN = 26;
+
+//batterie voltage pin
+const int BATTERY_VOLTAGE_PIN = 15;
 
 int updateData(String jsonStr);
 int send_data(MyData data);
@@ -32,7 +44,10 @@ int getLidarDistance();
 int getBMEValues();
 int getServosAngles();
 int setServosAngles();
+int setMotors();
 void printServo();
+int printLCD(String l1, String l2, int power);
+void readBatteryVoltage();
 
 MyData data;
 
@@ -40,10 +55,16 @@ Adafruit_BME280 bme;
 Servo servo1;
 Servo servo2;
 Servo servo3;
+Servo servo4;
 
 int brocheServo1 = 4;
 int brocheServo2 = 5;
 int brocheServo3 = 18;
+int brocheServo4 = 19;
+
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+String line1 = "WALL-E Ready!";
+String line2 = "";
 
 hw_timer_t *Timer_send_data = NULL; // Timer 
 volatile bool flag_send_data = false; // Flag levé par l'ISR
@@ -52,9 +73,9 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) { ; }
   Serial.println("Setup...");
-  Wire.begin(); // Initialise le bus I2C (SDA = D21, SCL = D22)
+  Wire.begin(); //I2C (SDA = D21, SCL = D22)
 
-  // Initialisation du BME280 à l'adresse 0x76
+  // BME280 à l'adresse 0x76
   if (!bme.begin(0x76)) {
     Serial.println("Erreur : BME280 introuvable à l'adresse 0x76 !");
   } else {
@@ -94,15 +115,40 @@ void setup() {
     Serial.println("Servo 3 attaché avec succès !");
   }
 
+  // Attachement du servo 4
+  if (servo4.attach(brocheServo4, 500, 2400) == -1) {
+    Serial.println("ERREUR : Impossible d'attacher le Servo 4 sur D19");
+  } else {
+    servo4.write(90);
+    Serial.println("Servo 4 attaché avec succès !");
+  }
+
   Serial.println("Lecture des servos");
-  data.servo1 = 90;
-  data.servo3 = 90;
-  data.servo1 = 90;
+  data.servo1 = 60;
+  data.servo2 = 60;
+  data.servo3 = 0;
+  data.servo4 = 60;
 
   setServosAngles();
   getServosAngles();
 
-  // envoie des donnée initiale
+  // Initialisation des moteurs
+  ledcAttach(PWM1_PIN, 1000, 8);
+  ledcAttach(PWM2_PIN, 1000, 8);
+  pinMode(DIR1_PIN, OUTPUT);
+  pinMode(DIR2_PIN, OUTPUT);
+  data.motor1 = 0;
+  data.motor2 = 0;
+  setMotors();
+  Serial.println("Moteurs initialisés.");
+
+  // Initialisation de l'écran LCD
+  lcd.init();
+  lcd.backlight();
+  printLCD(line1, line2, data.power);
+
+  //attach du pin de la batterie
+  pinMode(BATTERY_VOLTAGE_PIN, INPUT);
   
 }
 
@@ -122,6 +168,13 @@ void loop() {
       messageRecu = messageRecu.substring(4); // Enlève le préfixe "pi->"
       updateData(messageRecu);
       setServosAngles();
+      setMotors();
+    }
+    else if (messageRecu.startsWith("pimsg->")) {
+      messageRecu = messageRecu.substring(7); // Enlève le préfixe "pimsg->"
+      line1 = messageRecu.substring(0, messageRecu.indexOf('|'));
+      line2 = messageRecu.substring(messageRecu.indexOf('|') + 1);
+      printLCD(line1, line2, data.power);
     }
   }
 }
@@ -134,32 +187,31 @@ int getServosAngles(){
   data.servo1 = servo1.read();
   data.servo2 = servo2.read();
   data.servo3 = servo3.read();
+  data.servo4 = servo4.read();
   return 0;
 }
 int setServosAngles(){
   servo1.write(data.servo1);
   servo2.write(data.servo2);
   servo3.write(data.servo3);
+  servo4.write(data.servo4);
   return 0;
 }
 
 int getBMEValues() {
-  // Lecture de la température en degrés Celsius
   data.bme280[0] = bme.readTemperature();
   
-  // Lecture de l'humidité en pourcentage (%)
   data.bme280[1] = bme.readHumidity();
   
-  // Lecture de la pression (divisée par 100 pour passer de Pascals à hPa/millibars)
   data.bme280[2] = bme.readPressure() / 100.0F;
 
   // Sécurité : Vérifier si les valeurs lues sont valides (NaN = Not a Number)
   if (isnan(data.bme280[0]) || isnan(data.bme280[1]) || isnan(data.bme280[2])) {
     Serial.println("Erreur de lecture du BME280");
-    return -1; // Échec
+    return -1; 
   }
 
-  return 0; // Succès
+  return 0; 
 }
 
 int getLidarDistance() {
@@ -184,16 +236,45 @@ int getLidarDistance() {
     // 4. Mettre à jour ta structure de données
     data.lidar = (float)distance_cm;
     
-    return 0; // Succès
+    return 0; 
   }
   
-  return -1; // Échec de la lecture des données
+  return -1; 
 }
 
 int getDistance(){
   uint32_t voltage_mV = analogReadMilliVolts(sensorD1Pin);
   float distance_cm = (voltage_mV * 520.0) / 3300.0;
   data.ultrasonic1 = (int) distance_cm;
+
+  voltage_mV = analogReadMilliVolts(sensorD2Pin);
+  distance_cm = (voltage_mV * 520.0) / 3300.0;
+  data.ultrasonic2 = (int) distance_cm;
+
+  voltage_mV = analogReadMilliVolts(sensorD3Pin);
+  distance_cm = (voltage_mV * 520.0) / 3300.0;
+  data.ultrasonic3 = (int) distance_cm;
+
+  return 0;
+}
+
+int setMotors() {
+  if (data.motor1 >= 0) {
+    digitalWrite(DIR1_PIN, HIGH);
+    ledcWrite(PWM1_PIN, data.motor1);
+  } else {
+    digitalWrite(DIR1_PIN, LOW);
+    ledcWrite(PWM1_PIN, -data.motor1);
+  }
+
+  // Motor 2
+  if (data.motor2 >= 0) {
+    digitalWrite(DIR2_PIN, HIGH);
+    ledcWrite(PWM2_PIN, data.motor2);
+  } else {
+    digitalWrite(DIR2_PIN, LOW);
+    ledcWrite(PWM2_PIN, -data.motor2);
+  }
 
   return 0;
 }
@@ -217,6 +298,7 @@ int updateData(String jsonStr) {
 }
 
 int send_data(MyData data) {
+  readBatteryVoltage();
   getDistance();
   getLidarDistance();
   getBMEValues();
@@ -241,4 +323,30 @@ int send_data(MyData data) {
   Serial.println(jsonStr);
   
   return 0;
+}
+
+int printLCD(String l1, String l2, int power) {
+  String powerStr = String(power) + "%";
+  int maxL2 = 20 - (int)powerStr.length();
+  if ((int)l2.length() > maxL2) {
+    l2 = l2.substring(0, maxL2);
+  }
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(l1);
+  lcd.setCursor(0, 1);
+  lcd.print(l2);
+  lcd.setCursor(20 - (int)powerStr.length(), 1);
+  lcd.print(powerStr);
+  return 0;
+}
+
+
+void readBatteryVoltage() {
+  uint32_t vOut_mV = analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
+  float voltage = (vOut_mV / 1000.0) * 3.96;
+  int percentage = (int)((voltage - 10.5) / (12.6 - 10.5) * 100);
+  if (percentage > 100) percentage = 100;
+  if (percentage < 0)   percentage = 0;
+  data.power = (int)((percentage + data.power*10)/11);
 }
