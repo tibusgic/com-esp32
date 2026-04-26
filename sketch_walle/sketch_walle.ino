@@ -66,6 +66,11 @@ LiquidCrystal_I2C lcd(0x27, 20, 4);
 String line1 = "WALL-E Ready!";
 String line2 = "";
 
+int last_motor1 = 0;
+int last_motor2 = 0;
+int current_motor1 = 0;
+int current_motor2 = 0;
+
 hw_timer_t *Timer_send_data = NULL; // Timer 
 volatile bool flag_send_data = false; // Flag levé par l'ISR
 
@@ -327,17 +332,18 @@ int send_data(MyData data) {
 
 int printLCD(String l1, String l2, int power) {
   String powerStr = String(power) + "%";
+
+  if ((int)l1.length() > 20) l1 = l1.substring(0, 20);
   int maxL2 = 20 - (int)powerStr.length();
-  if ((int)l2.length() > maxL2) {
-    l2 = l2.substring(0, maxL2);
-  }
+  if ((int)l2.length() > maxL2) l2 = l2.substring(0, maxL2);
+
+  while ((int)l2.length() < maxL2) l2 += ' ';
+
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(l1);
   lcd.setCursor(0, 1);
-  lcd.print(l2);
-  lcd.setCursor(20 - (int)powerStr.length(), 1);
-  lcd.print(powerStr);
+  lcd.print(l2 + powerStr);
   return 0;
 }
 
